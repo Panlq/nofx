@@ -4,13 +4,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
+	"time"
+
 	"nofx/decision"
 	"nofx/logger"
 	"nofx/market"
 	"nofx/mcp"
 	"nofx/pool"
-	"strings"
-	"time"
 )
 
 // AutoTraderConfig 自动交易配置（简化版 - AI全权决策）
@@ -24,8 +25,9 @@ type AutoTraderConfig struct {
 	Exchange string // "binance", "hyperliquid" 或 "aster"
 
 	// 币安API配置
-	BinanceAPIKey    string
-	BinanceSecretKey string
+	BinanceAPIKey     string
+	BinanceSecretKey  string
+	BinanceAPIKeyType string // 币安API签名类型,默认为Hmac,支持Ed25519，RSA，Hmac
 
 	// Hyperliquid配置
 	HyperliquidPrivateKey string
@@ -136,7 +138,7 @@ func NewAutoTrader(config AutoTraderConfig) (*AutoTrader, error) {
 	switch config.Exchange {
 	case "binance":
 		log.Printf("🏦 [%s] 使用币安合约交易", config.Name)
-		trader = NewFuturesTrader(config.BinanceAPIKey, config.BinanceSecretKey)
+		trader = NewFuturesTrader(config.BinanceAPIKey, config.BinanceSecretKey, config.BinanceAPIKeyType)
 	case "hyperliquid":
 		log.Printf("🏦 [%s] 使用Hyperliquid交易", config.Name)
 		trader, err = NewHyperliquidTrader(config.HyperliquidPrivateKey, config.HyperliquidWalletAddr, config.HyperliquidTestnet)
@@ -153,16 +155,28 @@ func NewAutoTrader(config AutoTraderConfig) (*AutoTrader, error) {
 		return nil, fmt.Errorf("不支持的交易平台: %s", config.Exchange)
 	}
 
-	// 验证初始金额配置
-	if config.InitialBalance <= 0 {
-		return nil, fmt.Errorf("初始金额必须大于0，请在配置中设置InitialBalance")
+	// 设置默认扫描间隔
+	if config.ScanInterval <= 0 {
+		config.ScanInterval = 3 * time.Minute
 	}
 
-	// 初始化决策日志记录器（使用trader ID创建独立目录）
-	logDir := fmt.Sprintf("decision_logs/%s", config.ID)
-	decisionLogger := logger.NewDecisionLogger(logDir)
+	// 设置默认杠杆
+	if config.BTCETHLeverage <= 0 {
+		config.BTCETHLeverage = 5
+	}
+	if config.AltcoinLeverage <= 0 {
+		config.AltcoinLeverage = 5
+	}
 
-	return &AutoTrader{
+	// 设置默认风控参数
+	if config.StopTradingTime <= 0 {
+		config.StopTradingTime = 60 * time.Minute
+	}
+
+	// 创建决策日志记录器
+	decisionLogger := logger.NewDecisionLogger(config.ID)
+
+	at := &AutoTrader{
 		id:                    config.ID,
 		name:                  config.Name,
 		aiModel:               config.AIModel,
@@ -173,11 +187,12 @@ func NewAutoTrader(config AutoTraderConfig) (*AutoTrader, error) {
 		decisionLogger:        decisionLogger,
 		initialBalance:        config.InitialBalance,
 		lastResetTime:         time.Now(),
-		startTime:             time.Now(),
-		callCount:             0,
-		isRunning:             false,
 		positionFirstSeenTime: make(map[string]int64),
-	}, nil
+		startTime:             time.Now(),
+	}
+
+	log.Printf("✅ [%s] Trader初始化完成", config.Name)
+	return at, nil
 }
 
 // Run 运行自动交易主循环
