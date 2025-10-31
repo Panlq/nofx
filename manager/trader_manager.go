@@ -3,10 +3,11 @@ package manager
 import (
 	"fmt"
 	"log"
-	"nofx/config"
-	"nofx/trader"
 	"sync"
 	"time"
+
+	"nofx/config"
+	"nofx/trader"
 )
 
 // TraderManager 管理多个trader实例
@@ -39,6 +40,7 @@ func (tm *TraderManager) AddTrader(cfg config.TraderConfig, coinPoolURL string, 
 		Exchange:              cfg.Exchange,
 		BinanceAPIKey:         cfg.BinanceAPIKey,
 		BinanceSecretKey:      cfg.BinanceSecretKey,
+		BinanceAPIKeyType:     cfg.GetBinanceAPIKeyType(), // 获取币安API签名类型
 		HyperliquidPrivateKey: cfg.HyperliquidPrivateKey,
 		HyperliquidWalletAddr: cfg.HyperliquidWalletAddr,
 		HyperliquidTestnet:    cfg.HyperliquidTestnet,

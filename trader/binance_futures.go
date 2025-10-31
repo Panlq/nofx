@@ -29,9 +29,10 @@ type FuturesTrader struct {
 	cacheDuration time.Duration
 }
 
-// NewFuturesTrader 创建合约交易器
-func NewFuturesTrader(apiKey, secretKey string) *FuturesTrader {
+// NewFuturesTrader 创建合约交易器（使用默认HMAC签名类型）
+func NewFuturesTrader(apiKey, secretKey, keyType string) *FuturesTrader {
 	client := futures.NewClient(apiKey, secretKey)
+	client.KeyType = keyType
 	return &FuturesTrader{
 		client:        client,
 		cacheDuration: 15 * time.Second, // 15秒缓存
@@ -158,7 +159,6 @@ func (t *FuturesTrader) SetLeverage(symbol string, leverage int) error {
 		Symbol(symbol).
 		Leverage(leverage).
 		Do(context.Background())
-
 	if err != nil {
 		// 如果错误信息包含"No need to change"，说明杠杆已经是目标值
 		if contains(err.Error(), "No need to change") {
@@ -183,7 +183,6 @@ func (t *FuturesTrader) SetMarginType(symbol string, marginType futures.MarginTy
 		Symbol(symbol).
 		MarginType(marginType).
 		Do(context.Background())
-
 	if err != nil {
 		// 如果已经是该模式，不算错误
 		if contains(err.Error(), "No need to change") {
@@ -233,7 +232,6 @@ func (t *FuturesTrader) OpenLong(symbol string, quantity float64, leverage int) 
 		Type(futures.OrderTypeMarket).
 		Quantity(quantityStr).
 		Do(context.Background())
-
 	if err != nil {
 		return nil, fmt.Errorf("开多仓失败: %w", err)
 	}
@@ -279,7 +277,6 @@ func (t *FuturesTrader) OpenShort(symbol string, quantity float64, leverage int)
 		Type(futures.OrderTypeMarket).
 		Quantity(quantityStr).
 		Do(context.Background())
-
 	if err != nil {
 		return nil, fmt.Errorf("开空仓失败: %w", err)
 	}
@@ -329,7 +326,6 @@ func (t *FuturesTrader) CloseLong(symbol string, quantity float64) (map[string]i
 		Type(futures.OrderTypeMarket).
 		Quantity(quantityStr).
 		Do(context.Background())
-
 	if err != nil {
 		return nil, fmt.Errorf("平多仓失败: %w", err)
 	}
@@ -383,7 +379,6 @@ func (t *FuturesTrader) CloseShort(symbol string, quantity float64) (map[string]
 		Type(futures.OrderTypeMarket).
 		Quantity(quantityStr).
 		Do(context.Background())
-
 	if err != nil {
 		return nil, fmt.Errorf("平空仓失败: %w", err)
 	}
@@ -407,7 +402,6 @@ func (t *FuturesTrader) CancelAllOrders(symbol string) error {
 	err := t.client.NewCancelAllOpenOrdersService().
 		Symbol(symbol).
 		Do(context.Background())
-
 	if err != nil {
 		return fmt.Errorf("取消挂单失败: %w", err)
 	}
@@ -472,7 +466,6 @@ func (t *FuturesTrader) SetStopLoss(symbol string, positionSide string, quantity
 		WorkingType(futures.WorkingTypeContractPrice).
 		ClosePosition(true).
 		Do(context.Background())
-
 	if err != nil {
 		return fmt.Errorf("设置止损失败: %w", err)
 	}
@@ -510,7 +503,6 @@ func (t *FuturesTrader) SetTakeProfit(symbol string, positionSide string, quanti
 		WorkingType(futures.WorkingTypeContractPrice).
 		ClosePosition(true).
 		Do(context.Background())
-
 	if err != nil {
 		return fmt.Errorf("设置止盈失败: %w", err)
 	}

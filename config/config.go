@@ -5,21 +5,24 @@ import (
 	"fmt"
 	"os"
 	"time"
+
+	common "github.com/adshao/go-binance/v2/common"
 )
 
 // TraderConfig 单个trader的配置
 type TraderConfig struct {
 	ID      string `json:"id"`
 	Name    string `json:"name"`
-	Enabled bool   `json:"enabled"` // 是否启用该trader
+	Enabled bool   `json:"enabled"`  // 是否启用该trader
 	AIModel string `json:"ai_model"` // "qwen" or "deepseek"
 
 	// 交易平台选择（二选一）
 	Exchange string `json:"exchange"` // "binance" or "hyperliquid"
 
 	// 币安配置
-	BinanceAPIKey    string `json:"binance_api_key,omitempty"`
-	BinanceSecretKey string `json:"binance_secret_key,omitempty"`
+	BinanceAPIKey     string `json:"binance_api_key,omitempty"`
+	BinanceSecretKey  string `json:"binance_secret_key,omitempty"`
+	BinanceAPIKeyType string `json:"binance_api_key_type,omitempty"` // 币安API签名类型: "Hmac" or "Ed25519" or "RSA"
 
 	// Hyperliquid配置
 	HyperliquidPrivateKey string `json:"hyperliquid_private_key,omitempty"`
@@ -139,6 +142,13 @@ func (c *Config) Validate() error {
 			if trader.BinanceAPIKey == "" || trader.BinanceSecretKey == "" {
 				return fmt.Errorf("trader[%d]: 使用币安时必须配置binance_api_key和binance_secret_key", i)
 			}
+			// 验证币安API签名类型配置
+			if trader.BinanceAPIKeyType != "" &&
+				trader.BinanceAPIKeyType != common.KeyTypeEd25519 &&
+				trader.BinanceAPIKeyType != common.KeyTypeHmac &&
+				trader.BinanceAPIKeyType != common.KeyTypeRsa {
+				return fmt.Errorf("trader[%d]: binance_api_key_type必须是 'Hmac' 或 'Ed25519' 或 'RSA'", i)
+			}
 		} else if trader.Exchange == "hyperliquid" {
 			if trader.HyperliquidPrivateKey == "" {
 				return fmt.Errorf("trader[%d]: 使用Hyperliquid时必须配置hyperliquid_private_key", i)
@@ -198,4 +208,14 @@ func (c *Config) Validate() error {
 // GetScanInterval 获取扫描间隔
 func (tc *TraderConfig) GetScanInterval() time.Duration {
 	return time.Duration(tc.ScanIntervalMinutes) * time.Minute
+}
+
+// GetBinanceAPIKeyType 获取币安API签名类型
+func (tc *TraderConfig) GetBinanceAPIKeyType() string {
+	switch tc.BinanceAPIKeyType {
+	case common.KeyTypeRsa, common.KeyTypeEd25519, common.KeyTypeHmac:
+		return tc.BinanceAPIKeyType
+	default:
+		return common.KeyTypeHmac // 默认使用Hmac
+	}
 }
